@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+# Use this script on your git server to kill all unreachable objects and
+# compress your repositories to the smallest size possible. May be useful if the
+# repositories receive a lot of forced pushes.
+
+set -euo pipefail
+
+# shellcheck disable=SC1004
+find . -name '*.git' -type d -exec bash -c '
+  green="\e[1;32m"
+  no_color="\e[0m"
+
+  dir="$1"
+
+  printf "\nCompressing objects in repository at %b%s%b\n" \
+         "$green" \
+         "$dir" \
+         "$no_color"
+
+  before="$(git -C "$dir" count-objects -v)"
+
+  git -C "$dir" repack -Ad      # Kill in-pack garbage.
+  git -C "$dir" prune           # Kill loose garbage.
+
+  after="$(git -C "$dir" count-objects -v)"
+
+  if diff --brief <(echo "$before" ) <(echo "$after") > /dev/null; then
+    printf "\nNo changes were made:\n%s\n" "$before"
+  else
+    printf "\nRepository was compressed:\n"
+    diff --unified=42 --color=always <(echo "$before" ) <(echo "$after") | tail -n +4
+  fi
+' -- {} \;

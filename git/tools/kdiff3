@@ -1,0 +1,45 @@
+#!/usr/bin/env sh
+#
+# export GIT_DIFFMERGE_VERBOSE=1 to enable logging
+
+script_path="${0%/*}"
+. "$script_path/diff-and-merge-support"
+
+tool="$(tool_path '/c/Tools/KDiff3/kdiff3.exe' \
+                  '/mnt/c/Tools/KDiff3/kdiff3.exe' \
+                  'kdiff3' \
+                  '/Applications/kdiff3.app/Contents/MacOS/kdiff3')" || exit $?
+
+op="${1?Need operation (diff or merge) as the first argument}"
+shift
+
+case "$op" in
+  diff)
+    diff_args "$1" "$2" || exit $?
+
+    exec "$tool" "$left" \
+                 "$right" \
+                 --L1 "$left_title" \
+                 --L2 "$right_title" \
+                 > /dev/null 2>&1
+    ;;
+
+  merge)
+    merge_args "$1" "$2" "$3" "$4" || exit $?
+
+    exec "$tool" --merge \
+                 "$base" \
+                 "$local" \
+                 "$remote" \
+                 --output "$result" \
+                 --L1 "Base: $4" \
+                 --L2 "Ours: $local_desc" \
+                 --L3 "Theirs: $remote_desc" \
+                 > /dev/null 2>&1
+    ;;
+
+  *)
+    printf 'Unknown operation: %s\n' "$op" >&2
+    exit 1
+    ;;
+esac

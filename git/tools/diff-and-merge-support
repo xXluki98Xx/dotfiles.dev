@@ -1,0 +1,137 @@
+# export GIT_DIFFMERGE_VERBOSE=1 to enable logging.
+
+# Assume we are dot-sourced from a script in our own directory.
+_script_path="${0%/*}"
+
+find_cygpath() {
+  local cygpath
+
+  if cygpath="$(command -v cygpath)"; then
+    printf '%s' "$cygpath"
+    return
+  fi
+
+  # Try local copy of cygpath.exe and cygwin1.dll (e.g. for msysgit).
+  cygpath="$_script_path/cygpath.exe"
+  if [ -f "$cygpath" ] && [ -x "$cygpath" ]; then
+    printf '%s' "$cygpath"
+    return
+  fi
+
+  printf "No cygpath in: \$PATH, %s\n" "$_script_path" >&2
+  return 1
+}
+
+tool_path() {
+  [ $# = 0 ] && printf "Need tool candidate paths\n" >&2 && return 1
+
+  for canditate in "$@"; do
+    if command -v "$canditate" > /dev/null; then
+      printf '%s' "$canditate"
+      return
+    fi
+  done
+
+  printf "Tool executable not available at: %s\n" "$@" >&2
+  return 2
+}
+
+# Sets global variables: left, left_title, right, right_title.
+diff_args() {
+  left="${1?Need left file}"
+  right="${2?Need right file}"
+
+  # Extract file name from git's temporary file: /tmp/<garbage>_filename.
+  left_title="Old: ${left#*_}"
+  if [ ! -f "$left" ] && [ ! -d "$left" ]; then
+    left_title="<File didn't exist>"
+  fi
+
+  right_title="New: ${right#*_}"
+  if [ ! -f "$right" ] && [ ! -d "$right" ]; then
+    right_title="<File has been deleted>"
+  fi
+
+  if [ "$OSTYPE" = 'cygwin' ] || [ "$OSTYPE" = 'msys' ]; then
+    local cygpath
+    cygpath="$(find_cygpath)" || exit 1
+
+    if [ ! -f "$left" ] && [ ! -d "$left" ]; then
+      left="$_script_path/empty"
+    fi
+    left="$("$cygpath" --mixed "$left")"
+
+    if [ ! -f "$right" ] && [ ! -d "$right" ]; then
+      right="$_script_path/empty"
+    fi
+    right="$("$cygpath" --mixed "$right")"
+  fi
+
+  if [ -n "$GIT_DIFFMERGE_VERBOSE" ]; then
+    printf "Cygpath: %s\n"                     "$cygpath"
+    printf "Left:    %s -> %s (Title: %s)\n"   "$1" "$left"  "$left_title"
+    printf "Right:   %s -> %s (Title: %s)\n\n" "$2" "$right" "$right_title"
+    printf "Command line:\n"
+    set -x
+  fi
+}
+
+# Sets global variables: base, local, remote, result, local_desc, remote_desc.
+merge_args() {
+  base="${1?Need base file}"
+  local="${2?Need local file}"
+  remote="${3?Need remote file}"
+  result="${4?Need result file}"
+
+  local_desc="$(git describe --all --always HEAD)"
+  remote_desc='Stashed changes'
+
+  local git_dir
+  if ! git_dir="$(git rev-parse --git-dir 2> /dev/null)"; then
+    printf "Could not get git directory, exit status %s\n" "$?" >&2
+    exit 1
+  fi
+
+  local file
+  for file in rebase-merge/stopped-sha \
+              rebase-merge/original-commit \
+              rebase-apply/original-commit \
+              MERGE_HEAD \
+              CHERRY_PICK_HEAD \
+              REVERT_HEAD; do
+    file="$git_dir/$file"
+    if [ -f "$file" ]; then
+      remote_desc="$(git describe --all --always --contains "$(<"$file")")"
+      break
+    fi
+  done
+
+  if [ "$OSTYPE" = 'cygwin' ] || [ "$OSTYPE" = 'msys' ]; then
+    local cygpath
+    cygpath="$(find_cygpath)" || exit 1
+
+    # Replace /dev/null with an empty file on Windows.
+    if [ ! -f "$base" ]; then
+      base="$_script_path/empty"
+    fi
+
+    base="$($cygpath --mixed "$base")"
+    local="$("$cygpath" --mixed "$local")"
+    remote="$("$cygpath" --mixed "$remote")"
+    result="$("$cygpath" --mixed "$result")"
+  fi
+
+  if [ -n "$GIT_DIFFMERGE_VERBOSE" ]; then
+    printf "Cygpath:     %s\n"         "$cygpath"
+    printf "Base:        %s -> %s\n"   "$1" "$base"
+    printf "Local:       %s -> %s\n"   "$2" "$local"
+    printf "Local desc:  %s\n"         "$local_desc"
+    printf "Remote:      %s -> %s\n"   "$3" "$remote"
+    printf "Remote desc: %s\n"         "$remote_desc"
+    printf "Result:      %s -> %s\n\n" "$4" "$result"
+    printf "Command line:\n"
+    set -x
+  fi
+}
+
+# vim: set ft=sh ts=2 sw=2 et:

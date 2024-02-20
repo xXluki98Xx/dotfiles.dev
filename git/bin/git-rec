@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+root="$PWD"
+nogit=
+error_exit=0
+
+opt=
+while getopts ':hnr:' opt; do
+  case "$opt" in
+    h)
+      read -r -d '' usage <<"EOF"
+%s [-h] [-n] [-r ROOT] COMMAND
+
+Run git command recursively inside all git repositories under the current directory.
+
+Execute `git config --local git-rec.ignore true` inside a repository to ignore it.
+
+Options:
+-r\tSpecify another root directory
+-n\tDo not imply git command (i.e. do not prefix 'git' to COMMAND)
+-h\tShow help
+EOF
+
+      printf "$usage\\n" "${0##*/}"
+      exit 0
+      ;;
+
+    n)
+      nogit=true
+      ;;
+
+    r)
+      root="$OPTARG"
+      ;;
+
+    '?')
+      printf 'Invalid option: -%s\n' "$OPTARG"
+      exit 1
+      ;;
+  esac
+done
+
+command=()
+if [[ -z "$nogit" ]]; then
+  command=(git)
+fi
+
+if [[ $# -eq 0 ]]; then
+  printf 'Need command\n'
+  exit 2
+fi
+
+shift $((OPTIND - 1))
+command+=("$@")
+
+command_as_string="$(printf "%q " "${command[@]}")"
+command_as_string="${command_as_string% }"
+
+if [[ -t 1 ]]; then
+  red='\e[1;31m'
+  green='\e[1;32m'
+  yellow='\e[1;33m'
+  reset='\e[0m'
+fi
+
+printf 'Running %b%s%b in git repositories below %b%s%b:\n' \
+       "$red" \
+       "$command_as_string" \
+       "$reset" \
+       "$green" \
+       "$root" \
+       "$reset"
+while IFS= read -d $'\0' -r dotgit; do
+  repo="${dotgit%.git}"
+
+  # Detect whether this is a submodule directory and skip.
+  if [[ -f "$dotgit" ]] && \
+     grep --quiet '\.git/modules/' "$dotgit"; then
+    printf '\n%bIgnored submodule directory%b %b%s%b\n' \
+           "$yellow" \
+           "$reset" \
+           "$green" \
+           "$repo" \
+           "$reset"
+    continue
+  fi
+
+  # Detect whether this repo is ignored and skip.
+  if [[ "$(git -C "$repo" config --local --get git-rec.ignore)" == 'true' ]]; then
+    printf '\n%bIgnored repository%b %b%s%b\n' \
+           "$yellow" \
+           "$reset" \
+           "$green" \
+           "$repo" \
+           "$reset"
+    continue
+  fi
+
+  printf '\nRunning %b%s%b in %b%s%b\n' \
+         "$red" \
+         "$command_as_string" \
+         "$reset" \
+         "$green" \
+         "$repo" \
+         "$reset"
+
+  if pushd "$repo" > /dev/null; then
+    if "${command[@]}"; then
+      printf '%b✔%b Success\n' "$green" "$reset"
+    else
+      error_exit=$?
+
+      printf '%b✘%b Failed with exit status %d\n' \
+             "$red" \
+             "$reset" \
+             "$error_exit"
+    fi
+
+    popd > /dev/null
+  fi
+done < <(find "$root" \( -type d -o -type f \) -name .git -print0 | sort --zero-terminated)
+
+exit $error_exit

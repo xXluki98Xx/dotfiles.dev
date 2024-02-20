@@ -1,0 +1,18 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    flatpak install -y --or-update flathub org.mozilla.Thunderbird
+fi
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    cask thunderbird
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]] || [[ "$OSTYPE" == "fedora" ]]; then
+    if [[ ! -d /snap/thunderbird ]]; then
+        echo installing thunderbird
+        sudo snap install thunderbird
+    fi
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:

@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+
+# Restart systemd services with that are based on outdated docker images.
+#
+# The service name is derived from the container name.
+#
+# Container        |  systemd Service
+# example          |  example.service
+# compose_db_1     |  compose.service
+# service_instance |  service.service
+#
+# If systemd service units are templated, assume the docker containers are named
+# with `@` replaced by `_`, e.g. the container created by
+# service@instance.service is named service_instance.
+
+set -euo pipefail
+# set -x
+shopt -s extglob
+
+red='\e[1;31m'
+green='\e[1;32m'
+alternate='\e[1;36m'
+reset='\e[0m'
+
+map-container-to-service()
+{
+  container="${1?Need container name}"
+  printf '%s' "${container%%_*}.service"
+}
+
+print-services()
+{
+  local -n services="${1?Need array reference}"
+
+  if ! (( ${#services[@]} )); then
+    printf 'No services need restarting\n'
+    return 1
+  fi
+
+  readarray -t services < <(printf '%s\n' "${services[@]}" | sort | uniq)
+
+  printf '\nThe following services are about to restart: %b%s%b\n' \
+        "$green" \
+        "${services[*]}" \
+        "$reset"
+}
+
+select-services()
+{
+  local index
+  # shellcheck disable=SC2178
+  local -n services="${1?Need array reference}"
+  local selected=()
+
+  printf 'Enter the indices for the services you want to restart\n'
+  printf '  - separate indices with spaces\n'
+  printf '  - * selects everything\n'
+  printf '  - -<index> excludes service (-* excludes everything)\n'
+  printf '  - no input accepts selection\n'
+
+  while :; do
+    printf 'Index\tSelected\tService\n'
+    for index in "${!services[@]}"; do
+      local included=' '
+      [[ "${selected[$index]-}" == "${services[$index]}" ]] && included='*'
+
+      local color="$reset"
+      (( index % 2 == 0 )) && color="$alternate"
+
+      printf '%b%s\t%s\t\t%s%b\n' "$color" "$index" "$included" "${services[$index]}" "$reset"
+    done
+
+    read -r -p '> ' -e -a selection
+
+    # Nothing entered, break.
+    if ! (( ${#selection[@]} )); then
+      services=("${selected[@]}")
+      return
+    fi
+
+    for index in "${!selection[@]}"; do
+      local value="${selection[$index]}"
+
+      case "$value" in
+        +([[:digit:]]))
+          selected[$value]="${services[$value]}"
+          ;;
+
+        -+([[:digit:]]))
+          unset selected["${value#-}"]
+          ;;
+
+        '-*')
+          selected=()
+          ;;
+
+        '*')
+          selected=("${services[@]}")
+          ;;
+
+        *)
+          printf 'Unsupported value: %s\n' "$value"
+          ;;
+      esac
+    done
+  done
+}
+
+outdated=()
+
+mapfile -t used_images < <(docker container \
+                                 ls \
+                                 --no-trunc \
+                                 --format '{{.Image}}' |
+                                 sort |
+                                 uniq)
+
+for image in "${used_images[@]}"; do
+  printf 'Inspecting image %b%s%b\n' \
+         "$green" \
+         "$image" \
+         "$reset"
+
+  mapfile -t image_history < <(docker image history --no-trunc --quiet "$image")
+
+  for layer in "${image_history[@]}"; do
+    [[ "$layer" == '<missing>' ]] && continue
+
+    tags_digests="$(docker image inspect --format '{{.RepoTags}}{{.RepoDigests}}' "$layer")"
+
+    # If an image has a repo digest it was downloaded from a registry. If it is
+    # untagged the tag likely has been removed by a docker pull that updated the
+    # tag.
+    no_tags_but_repo_digests='^\[\]\[.+\]'
+    if [[ "$tags_digests" =~ $no_tags_but_repo_digests ]]; then
+      mapfile -t containers < <(docker container \
+                                      ls \
+                                      --no-trunc \
+                                      --format '{{.Names}}' \
+                                      --filter "ancestor=$image")
+
+      printf 'Outdated associated containers: %b%s%b\n' \
+             "$red" \
+             "${containers[*]}" \
+             "$reset"
+      for container in "${containers[@]}"; do
+        outdated+=("$(map-container-to-service "$container")")
+      done
+
+      break
+    fi
+  done
+done
+
+print-services outdated || exit 0
+
+if [[ ! "${1-}" =~ ^(-f|--force)$ ]]; then
+  read -r -e -n 1 -p "Continue? [y/N/i] " answer
+
+  case "$answer" in
+    [Ii])
+      select-services outdated
+      print-services outdated || exit 0
+      ;;
+
+    [Yy])
+      ;;
+
+    *)
+      exit 1
+      ;;
+  esac
+fi
+
+for service in "${outdated[@]}"; do
+  printf '%b%s%b: ' "$green" "$service" "$reset"
+
+  script="/var/data/${service%.service}/systemd/upgrade"
+  if [[ -x "$script" ]]; then
+    printf 'running %b%s%b\n' "$green" "$script" "$reset"
+    "$script"
+  else
+    printf 'restarting\n'
+    systemctl restart "$service"
+  fi
+done
+
+printf '%bDone%b restarting services\n' \
+       "$green" \
+       "$reset"

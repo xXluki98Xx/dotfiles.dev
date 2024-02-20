@@ -1,0 +1,33 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    flatpak install -y --or-update flathub com.visualstudio.code
+fi
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    cask visual-studio-code
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]] || [[ "$OSTYPE" == "fedora" ]]; then
+    if [[ ! -d /snap/code ]]; then
+        echo installing visual studio code
+        sudo snap install --classic code
+    fi
+fi
+
+extensions=(
+    ms-kubernetes-tools.vscode-kubernetes-tools
+    github.vscode-github-actions
+    redhat.ansible
+)
+
+for extension in ${extensions[@]}
+do
+    if [[ "$OSTYPE" == "silverblue" ]]; then
+      flatpak run com.visualstudio.code --install-extension $extension
+    else
+      code --install-extension $extension
+    fi
+done
+
+# vim: set ft=sh ts=2 sw=2 et:

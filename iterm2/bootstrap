@@ -1,0 +1,14 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" != "mac" ]] && [[ "$OSTYPE" != "darwin" ]]; then
+    return
+fi
+
+cask iterm2
+
+symlink "$topic/scripts/git trainings.scpt" \
+        "$HOME/Library/Application Support/iTerm2/Scripts/git trainings.scpt"
+symlink "$topic/scripts/trainings.scpt" \
+        "$HOME/Library/Application Support/iTerm2/Scripts/trainings.scpt"
+
+# vim: set ft=sh ts=2 sw=2 et:

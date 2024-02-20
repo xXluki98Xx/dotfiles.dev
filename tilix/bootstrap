@@ -1,0 +1,13 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "windows" ]] || [[ "$OSTYPE" == "mac" ]]; then
+    return
+fi
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    rpm-ostree install --idempotent tilix
+fi
+
+dconf load /com/gexperts/Tilix/ < tilix/tilixConf.dconf
+
+# vim: set ft=sh ts=2 sw=2 et:

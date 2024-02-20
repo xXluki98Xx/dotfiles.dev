@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# If any of the following fails, the script fails.
+set -e
+
+if [ $# -lt 1 ]
+then
+  echo "Find files touched (differing) between HEAD and another branch"
+  echo ""
+  echo "USAGE: $0 [-g] <other-branch>"
+  echo ""
+  echo "       -g  Group by directory"
+  echo ""
+  echo "EXAMPLE: $0 master"
+  exit 1
+fi
+
+reference=$1
+if [ $# -eq 2 ]
+then
+  reference=$2
+fi
+
+files="git diff -z --name-only $reference..HEAD"
+
+if [ $# -eq 1 ]
+then
+  $files | xargs --null --max-lines=1 echo | sort | uniq
+else
+  $files | xargs --null --max-lines=1 dirname | sort | uniq
+fi

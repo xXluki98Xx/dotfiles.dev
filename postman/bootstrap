@@ -1,0 +1,18 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "windows" ]]; then
+    return
+fi
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    cask postman
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]] || [[ "$OSTYPE" == "fedora" ]]; then
+    if [[ ! -d /snap/code ]]; then
+        echo installing postman
+        sudo snap install postman
+    fi
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:

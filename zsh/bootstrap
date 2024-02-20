@@ -1,0 +1,38 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "windows" ]]; then
+  return
+fi
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    formula zsh
+
+    # Allow users to chsh to homebrew-installed zsh.
+    brew_zsh="$(brew --prefix)/bin/zsh"
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]]; then
+    sudo apt install zsh -y
+
+    brew_zsh="/usr/bin/zsh"
+fi
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    rpm-ostree install --idempotent zsh
+    
+    brew_zsh="/usr/bin/zsh"
+fi
+
+shells=/etc/shells
+if ! grep -F -q "$brew_zsh" "$shells"; then
+    echo "$brew_zsh" | sudo -p "Adding $brew_zsh to $shells. Password:" -- tee -a "$shells" > /dev/null
+
+    # After set up, change the shell.
+    chsh -s "$brew_zsh"
+fi
+
+symlink "$topic/zprofile"
+symlink "$topic/zshenv"
+symlink "$topic/zshrc"
+
+# vim: set ft=sh ts=2 sw=2 et:

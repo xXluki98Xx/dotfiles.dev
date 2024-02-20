@@ -1,0 +1,24 @@
+#!/bin/sh
+
+commit()
+{
+  mkdir --parents "$(dirname "$2")"
+
+  printf "$1" > "$2"
+  git add "$2"
+  git commit --message "$1"
+}
+
+file_name="some path/conflicted file"
+
+git init
+
+commit "unrelated file" "unrelated file"
+
+git checkout -b another_branch
+commit "their line" "$file_name"
+
+git checkout master
+commit "our line" "$file_name"
+
+git merge another_branch

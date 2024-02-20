@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Prettier docker ps output.
+
+set -euo pipefail
+
+# docker rmi $(docker images -a --format 'table {{.ID}} {{.Tag}}' "${@}" | grep "<none>")
+docker rmi -f $(docker images -a -q)
+docker rm -f $(docker ps -a -q)

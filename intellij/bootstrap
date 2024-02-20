@@ -1,0 +1,14 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    cask intellij-idea-ce
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]] || [[ "$OSTYPE" == "fedora" ]]; then
+    if [[ ! -d /snap/code ]]; then
+        echo installing jetbrains intellij
+        sudo snap install intellij-idea-community --classic --edge
+    fi
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:

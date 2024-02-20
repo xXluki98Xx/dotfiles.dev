@@ -1,0 +1,10 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "windows" ]]; then
+  return
+fi
+
+if [[ -x "$(command -v pip3)" ]]; then
+  pip3 install glances
+fi
+# vim: set ft=sh ts=2 sw=2 et:

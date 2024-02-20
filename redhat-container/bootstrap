@@ -1,0 +1,21 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    formula podman
+    formula skopeo 
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]]; then
+    sudo apt install -y podman buildah skopeo
+fi
+
+if [[ "$OSTYPE" == "fedora" ]]; then
+    sudo dnf -y install podman buildah skopeo
+fi
+
+# podman, buildah and skopeo are already provided
+#if [[ "$OSTYPE" == "silverblue" ]]; then
+#    rpm-ostree install --idempotent buildah skopeo
+#fi
+
+# vim: set ft=sh ts=2 sw=2 et:

@@ -1,0 +1,7 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    formula jq
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:

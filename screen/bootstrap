@@ -1,0 +1,23 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "windows" ]]; then
+    return
+fi
+
+if [[ "$OSTYPE" == "mac" ]]; then
+    formula screen
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]]; then
+    sudo apt install -y screen
+fi
+
+if [[ "$OSTYPE" == "fedora" ]]; then
+    sudo dnf install -y screen
+fi
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    rpm-ostree install --idempotent screen
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:

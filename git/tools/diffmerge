@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+#
+# export GIT_DIFFMERGE_VERBOSE=1 to enable logging
+
+script_path="${0%/*}"
+. "$script_path/diff-and-merge-support"
+
+tool="$(tool_path '/c/Tools/DiffMerge/sgdm.exe' \
+                  '/c/Tools/DiffMerge/diffmerge.exe' \
+                  '/mnt/c/Tools/DiffMerge/sgdm.exe' \
+                  '/mnt/c/Tools/DiffMerge/diffmerge.exe' \
+                  'sgdm' \
+                  'diffmerge' \
+                  '/Applications/DiffMerge.app/Contents/Resources/diffmerge.sh')" || exit $?
+
+op="${1?Need operation (diff or merge) as the first argument}"
+shift
+
+case "$op" in
+  diff)
+    diff_args "$1" "$2" || exit $?
+
+    exec "$tool" "$left" \
+                 "$right" \
+                 --title1="$left_title" \
+                 --title2="$right_title" \
+                 > /dev/null 2>&1
+    ;;
+
+  merge)
+    merge_args "$1" "$2" "$3" "$4" || exit $?
+
+    exec "$tool" --merge \
+                 --result="$result" \
+                 "$local" \
+                 "$base" \
+                 "$remote" \
+                 --title1="Ours: $local_desc" \
+                 --title2="Merged: $4" \
+                 --title3="Theirs: $remote_desc"
+    ;;
+
+  *)
+    printf 'Unknown operation: %s\n' "$op" >&2
+    exit 1
+    ;;
+esac

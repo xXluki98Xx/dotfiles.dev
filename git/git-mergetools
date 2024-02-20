@@ -1,0 +1,34 @@
+[mergetool "bc"]
+	cmd = ~/.dotfiles/git/tools/beyondcompare merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+	trustExitCode = true
+
+[mergetool "code"]
+	cmd = ~/.dotfiles/git/tools/code merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+
+[mergetool "diffmerge"]
+	cmd = ~/.dotfiles/git/tools/diffmerge merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+	trustExitCode = true
+
+[mergetool "kdiff3"]
+	cmd = ~/.dotfiles/git/tools/kdiff3 merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+	trustExitCode = true
+
+[mergetool "meld"]
+	cmd = ~/.dotfiles/git/tools/meld merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+
+[mergetool "semantic-merge"]
+	cmd = ~/.dotfiles/git/tools/semantic-merge merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+	trustExitCode = false
+
+[mergetool "p4"]
+	cmd = ~/.dotfiles/git/tools/p4 merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+
+[mergetool "winmerge"]
+	# PLEASE DO NOT USE WINMERGE. IT IS INFERIOR TO ALL OTHER TOOLS LISTED HERE AND
+	# DOES NOT SUPPORT THREE-WAY MERGES.
+	#
+	# SEE: http://manual.winmerge.org/Faq.html#d0e9896
+	cmd = ~/.dotfiles/git/tools/winmerge merge \"$BASE\" \"$LOCAL\" \"$REMOTE\" \"$MERGED\"
+	trustExitCode = true
+
+# vim: set ft=gitconfig ts=2 sw=2 noet:

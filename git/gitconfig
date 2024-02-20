@@ -1,0 +1,122 @@
+[user]
+	email = lramm.dev@gmail.com
+	name = lRamm
+
+[core]
+	whitespace = cr-at-eol
+	quotepath = false
+
+[apply]
+	whitespace = nowarn
+
+[include]
+	path = ~/.dotfiles/git/git-aliases
+	# Those are symlinked by the bootstrapper:
+	path = ~/.git-config/alias-ui.config
+	path = ~/.git-config/credential-helper.config
+	path = ~/.git-config/gitignore.config
+	path = ~/.git-config/ruby-aliases.config
+
+[color]
+	ui = auto
+	wtf = true
+
+[color "diff"]
+	old = bold red
+	new = bold green
+	meta = bold yellow
+
+[color "branch"]
+	current = bold green
+	local = green
+	remote = red
+	upstream = bold red
+	plain = bold yellow
+
+[color "status"]
+	added = bold red
+	changed = bold green
+	untracked = bold cyan
+	nobranch = red reverse
+
+[color "interactive"]
+	prompt = bold blue
+	error = bold red
+
+[branch]
+	autoSetupMerge = true
+	autoSetupRebase = always
+
+[svn]
+	rmdir = true
+	findcopiesharder = true
+
+[merge]
+	tool = diffmerge
+	log = true
+
+[mergetool]
+	prompt = false
+	keepBackup = false
+
+[include]
+	path = ~/.dotfiles/git/git-mergetools
+
+[diff]
+	tool = code
+	renames = copies
+	submodule = log
+	compactionHeuristic = true
+	indentHeuristic = true
+
+[difftool]
+	prompt = false
+
+[include]
+	path = ~/.dotfiles/git/git-difftools
+
+[clean]
+	requireForce = false
+
+[rerere]
+	enabled = true
+	autoupdate = true
+
+[push]
+	default = simple
+	followTags = true
+
+[status]
+	#submodulesummary = true
+
+[rebase]
+	autoSquash = true
+
+[stash]
+	showPatch = true
+
+[pager]
+	# --no-init             - keep screen contents after quitting less (do not use alternative screen)
+	# --quit-at-eof         - quit less if EOF is reached
+	# --quit-if-one-screen  - quit immediately if output fits the screen
+	# --RAW-CONTROL-CHARS   - colorize output
+	log  = diff-so-fancy | LESS= less ${GIT_PAGER_ARGS---no-init --quit-at-eof --quit-if-one-screen} --RAW-CONTROL-CHARS
+	show = diff-so-fancy-smart '^(commit [a-f0-9]+|(added|deleted|modified|renamed): )'
+	diff = diff-so-fancy-smart '^(added|deleted|modified|renamed): '
+
+[color "diff-highlight"]
+	oldnormal = red
+	oldhighlight = red bold 52
+	newnormal = green
+	newhighlight = bold green 22
+
+[include]
+	path = ~/.git-config/windows/diff-highlight-colors.config
+
+[commit]
+	verbose = true
+
+[credential]
+	helper = store
+
+# vim: set ft=gitconfig ts=2 sw=2 noet:

@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+#
+# Convert a SVN repository to git. Convert SVN branches to local git branches
+# and SVN tags to local git tags. The conversion includes svn:externals for
+# trunk (master) and branches.
+#
+# Based on http://git-scm.com/book/en/Git-and-Other-Systems-Migrating-to-Git
+#
+# Caveats:
+#   * svn:externals are not processed recursively
+#   * I did not test removed externals or externals where the explicit SVN
+#     revision changed
+#   * I did not test externals pointing to files instead of directories
+#   * Works with bash >= 4.3
+#   * Clean up of SVN remotes used for externals is not implemented
+#   * svn:ignore metadata are not converted to .gitignore. Consider running
+#     git svn create-ignore
+#   * I assume there will be bugs, so check your clones for correctness!
+#
+# Example:
+# git svn-clone-externals \
+#   svn://svn.code.sf.net/p/svn-to-git/code/ \
+#   test-import \
+#   authors.txt
+#
+# With authors.txt containing:
+#   <SVN user> = git user information
+#   alexandergross = Alexander Groß <agross@therightstuff.de>
+#   zc2 = zc2 <zc2@example.com>
+#   (no author) = nobody <nobody@example.com>
+#
+# The "(no author)" line in authors.txt may be required if the first commit was
+# created automatically by the SVN hoster (Google Code did that). It needs to be
+# mapped to valid git username/email information, otherwise git would refuse to
+# import it.
+
+set -e
+set -o pipefail
+
+remote="${1?Pass SVN URL as the first parameter}"
+# Ensure trailing slash.
+[[ "$remote" != */ ]] && remote="${remote}/"
+path="${2?Pass clone directory as the second parameter}"
+users="${3?Pass user mapping file as the third parameter}"
+
+git svn clone "$remote" \
+              "--authors-file=$users" \
+              --stdlayout \
+              "$path"
+
+pushd "$path" > /dev/null
+
+# Convert SVN tags to git tags.
+prefix=refs/remotes/origin/tags/
+git for-each-ref '--format=%(refname)' "$prefix" |
+  while read -r tag; do
+    git tag "${tag#$prefix}" "$tag"
+    git branch --remotes --delete "${tag#refs/remotes/}"
+  done
+
+# Convert SVN branches to git local branches.
+prefix=refs/remotes/origin/
+git for-each-ref '--format=%(refname)' "$prefix" |
+  while read -r branch; do
+    git branch "${branch#$prefix}" "$branch"
+    git branch --remotes --delete "${branch#refs/remotes/}"
+  done
+git branch -d trunk
+
+# Add svn:externals to each commit.
+add_externals_filter=$(cat <<'EOS'
+#!/usr/bin/env bash
+
+set -e
+
+revision="$(git svn find-rev $GIT_COMMIT)"
+if [[ -z "$revision" ]]; then
+  >&2 printf '\n\nCould not determine SVN revision for %s, skipping\n' \
+              "$(git rev-parse --short $GIT_COMMIT)"
+  exit 0
+fi
+
+url="$(git show --format=%B $GIT_COMMIT | sed -n 's/git-svn-id: \(.*\)@[0-9]* .*/\1/p')"
+printf '\n\ncommit %s == SVN revision %s (%s)\n' \
+      "$(git rev-parse --short $GIT_COMMIT)" \
+      "$revision" \
+      "$url"
+
+root=
+svn propget \
+  --recursive \
+  --non-interactive \
+  --revision "$revision" \
+  svn:externals \
+  "$url" |
+  grep -v ^$ | \
+  while read -r line; do
+    declare -a "line=($line)"
+
+    if [[ "${line[1]}" = '-' ]]; then
+      root="${line[0]}"
+      # Make relative.
+      root="${root#$url}"
+      # Remove leading slash.
+      root="${root#/}"
+    fi
+
+    # SVN reports externals with mixed ordering, e.g.
+    # svn propget --recursive svn:externals svn://svn.code.sf.net/p/svn-to-git/code/trunk -r8
+    # reports <root> - <subdir> <external URL>, while
+    # svn propget --recursive svn:externals svn://svn.code.sf.net/p/svn-to-git/code/trunk -r9
+    # reports <root> - <external URL> <subdir>
+    #
+    # Hence, infer external URL and subdir by checking for '://'.
+    # What a shitshow.
+    if [[ "${line[-1]}" == *://* ]]; then
+      path="${line[-2]}"
+      svn_url="${line[-1]}"
+    else
+      path="${line[-1]}"
+      svn_url="${line[-2]}"
+    fi
+
+    # Build path relative to working copy.
+    dir="$root"
+    [[ -n "$dir" ]] && dir+=/
+    dir+="$path"
+
+    # URL decode.
+    dir="${dir//%/\\x}"
+    dir="$(echo -e "$dir")"
+
+    # Get (optional) revision from URL, fall back to HEAD if none is specified.
+    revision="${svn_url#*@}"
+    if [[ "$svn_url" == "$revision" ]]; then
+      revision=HEAD
+    fi
+
+    # Remove the (optional) revision from URL.
+    svn_url="${svn_url%@*}"
+
+    # Remove the (optional) trailing slash.
+    svn_url="${svn_url%/}"
+
+    printf 'Path: %s -> URL: %s, revision %s\n' "$dir" "$svn_url" "$revision"
+
+    name="git-svn-external-${svn_url//[^[:alpha:]]/-}"
+    remote_ref="refs/remotes/$name"
+
+    # Fetch the external into a separate subtree.
+    git config svn-remote.$name.url "$svn_url"
+    git config svn-remote.$name.fetch ":$remote_ref"
+    git svn fetch --svn-remote "$name" --revision "1:$revision"
+
+    # Merge the subtree into the svn:external folder.
+    if [[ "$revision" == 'HEAD' ]]; then
+      merged_sha="$(git rev-parse "$remote_ref")"
+    else
+      # git svn find-rev does not really care about --svn-remote.
+      # merged_sha="$(git svn find-rev --svn-remote "$name" r$revision)"
+      merged_sha="$(git log --format='%H' "$remote_ref" --grep "git-svn-id: .*@$revision " | head)"
+    fi
+
+    printf 'Merging %s into %s\n' "$merged_sha" "$dir"
+    git read-tree --prefix="$dir" "$merged_sha"
+
+    # Save SVN external parent for --parent-filter below.
+    #
+    # Comment this and you will not see the merge commits, but the files
+    # will be merged into your trees nonetheless.
+    svn_parent_file="$(git rev-parse --git-dir)/SVN_PARENTS"
+    printf "%s '%s'\n" "$merged_sha" "$dir" >> "$svn_parent_file"
+  done
+EOS
+)
+
+set_parents_filter=$(cat <<'EOS'
+#!/usr/bin/env bash
+
+set -e
+
+svn_parent_file="$(git rev-parse --git-dir)/SVN_PARENTS"
+
+while read parents; do
+  printf '%s ' "$parents"
+  >&2 printf 'Original parent(s): %s\n' "$parents"
+
+  if [[ ! -f "$svn_parent_file" ]]; then
+    continue
+  fi
+
+  for parent in $parents; do
+    if [[ "$parent" == -* ]]; then
+      continue
+    fi
+
+    while read -r parent_info; do
+      declare -a "line=($parent_info)"
+      sha="${line[0]}"
+      dir="${line[1]}"
+
+      >&2 printf 'Checking tree %s against parent %s\n' "$dir" "$parent"
+      if ! git diff-index --cached --quiet $parent -- "$dir"; then
+        # Index was updated, assume added or changed external.
+        printf '%s %s ' '-p' "$sha"
+
+        >&2 printf 'Additional parent: %s\n' "$sha"
+      else
+        >&2 printf 'No changes, omitting parent %s for directory %s\n' "$sha" "$dir"
+      fi
+    done < "$svn_parent_file"
+  done
+done
+
+rm -f "$svn_parent_file"
+EOS
+)
+
+add_externals_script="$(mktemp)"
+echo "$add_externals_filter" > "$add_externals_script"
+chmod +x "$add_externals_script"
+
+set_parents_script="$(mktemp)"
+echo "$set_parents_filter" > "$set_parents_script"
+chmod +x "$set_parents_script"
+
+git filter-branch --index-filter "$add_externals_script" \
+                  --parent-filter "$set_parents_script" \
+                  --commit-filter 'git commit-tree "$@"' \
+                  -- \
+                  --all
+
+printf '\nTags:\n'
+git tag
+
+printf '\nBranches:\n'
+git branch --all

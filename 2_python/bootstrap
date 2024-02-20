@@ -1,0 +1,24 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "windows" ]]; then
+    return
+fi
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    formula python3
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]]; then
+    sudo apt install -y python3 python3-pip
+fi
+
+if [[ "$OSTYPE" == "fedora" ]]; then
+    sudo dnf install -y python3 python3-pip
+fi
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    # python3 is already provided
+    rpm-ostree install --idempotent python3-pip
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:

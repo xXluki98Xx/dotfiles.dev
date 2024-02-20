@@ -1,0 +1,14 @@
+[/]
+prompt-on-delete-profile=false
+theme-variant='dark'
+
+[profile]
+default='2b7c4080-0ddd-46c5-8f23-56fd3ba789d'
+list=['2b7c4080-0ddd-46c5-8f23-56fd3ba789d']
+
+[profile/2b7c4080-0ddd-46c5-8f23-56fd3ba789d]
+custom-command='/usr/bin/zsh'
+login-shell=true
+terminal-title=''
+use-custom-command=true
+visible-name='Default'

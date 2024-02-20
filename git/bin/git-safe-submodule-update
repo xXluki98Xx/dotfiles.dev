@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+# This is just a draft and likely not a complete solution, especially if you use
+# nested submodules.
+
+function safe-submodule-update::colors {
+  local -A colors
+  colors[red]="$(git    config --get-color ''                      'bold red')"
+  colors[green]="$(git  config --get-color ''                      'bold green')"
+  colors[yellow]="$(git config --get-color ''                      'bold yellow')"
+  colors[head]="$(git   config --get-color 'color.decorate.HEAD'   'bold cyan')"
+  colors[branch]="$(git config --get-color 'color.decorate.branch' 'bold green')"
+  colors[reset]="$(git  config --get-color ''                      'reset')"
+
+  local key
+  for key in "${!colors[@]}"; do
+    printf 'c_%s=%b ' "$key" "${colors[$key]}"
+  done
+}
+
+function safe-submodule-update::cleanup {
+  # Clear traps.
+  trap - EXIT SIGHUP SIGINT SIGTERM
+
+  local fun
+  for fun in colors cleanup check update run; do
+    # Undefine function.
+    unset -f safe-submodule-update::$fun
+  done
+}
+
+function safe-submodule-update::check {
+  local check results
+
+  # git submodule foreach fails as soon as we exit 1 for any check.
+  # To communicate to this script whether any check failed, we use a temporary
+  # file and delete it as soon as any check failed. After git submodule foreach
+  # we check whether the file still exists. If it's gone, we failed.
+  success="$(mktemp)"
+
+  IFS='' read -r -d '' check <<"EOF" || true
+    head="$(git log --color -1 --oneline)"
+    ref="$(git name-rev --name-only --no-undefined HEAD 2> /dev/null)"
+
+    if [[ -n "$ref" ]]; then
+      printf '  %b%s%b %bHEAD%b is reachable by %b%s%b: %s\n' \
+        $c_green \
+        ✔ \
+        $c_reset \
+        $c_head \
+        $c_reset \
+        $c_branch \
+        "$ref" \
+        $c_reset \
+        "$head"
+    else
+      printf '  %b%s%b %bHEAD%b is not reachable by any ref: %s\n' \
+        $c_red \
+        ✖ \
+        $c_reset \
+        $c_head \
+        $c_reset \
+        "$head"
+
+      if [[ -n "$dry_run" || -n "$force_update" ]]; then
+        :
+      else
+        rm -f "$success"
+      fi
+    fi
+EOF
+
+  env "$@" "success=$success" git submodule foreach --recursive "$check"
+
+  [[ -f "$success" ]]
+}
+
+function safe-submodule-update::update {
+  local check_success="$1"
+  shift
+
+  local arg
+  for arg in "$@"; do
+    local "$arg"
+  done
+
+  if [[ -v dry_run ]]; then
+    printf '%b%s%b Dry run requested, omitting submodule update\n' \
+      "$c_yellow" \
+      ! \
+      "$c_reset"
+
+    return
+  fi
+
+  if [[ "$check_success" == 0 ]]; then
+    if [[ -v force_update ]]; then
+      printf '%b%s%b Forced update, updating submodules\n' \
+        "$c_yellow" \
+        ! \
+        "$c_reset"
+    else
+      printf '%b%s%b All checks passed, updating submodules\n' \
+        "$c_green" \
+        ✔ \
+        "$c_reset"
+    fi
+
+    git submodule update
+  else
+    printf '%b%s%b Some checks failed, refusing to update submodules\n' \
+      "$c_red" \
+      ✖ \
+      "$c_reset"
+
+    return 1
+  fi
+}
+
+function safe-submodule-update::run {
+  trap safe-submodule-update::cleanup EXIT SIGHUP SIGINT SIGTERM
+
+  local function_name="$1"
+  shift
+
+  local -a args
+  args=( $(safe-submodule-update::colors) )
+
+  local opt
+  while getopts ':hnf' opt; do
+    case "$opt" in
+      h)
+        printf '%s [-n] [-f] [-h]
+
+Checks whether submodule HEAD commits are reachable by branches or tags before running "git submodule update"
+
+Options:
+  -n\tDry run, check but do not update submodules
+  -f\tForce submodule update regardless of submodule HEAD reachability
+  -h\tShow help\n' \
+          "$function_name"
+        return
+        ;;
+
+      n)
+        args+=('dry_run=true')
+        ;;
+
+      f)
+        args+=('force_update=true')
+        ;;
+
+      '?')
+        printf 'Invalid option: -%s\n' "$OPTARG"
+        return 1
+        ;;
+    esac
+  done
+
+  safe-submodule-update::check "${args[@]}"
+  safe-submodule-update::update $? "${args[@]}"
+}
+
+safe-submodule-update::run "${0##*/}" "$@"

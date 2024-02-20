@@ -1,0 +1,24 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "windows" ]]; then
+    return
+fi
+
+if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+    return
+fi
+
+if [[ "$OSTYPE" == "ubuntu" ]]; then
+    sudo apt update
+fi
+
+if [[ "$OSTYPE" == "fedora" ]]; then
+    sudo dnf update
+fi
+
+# rpm-ostree will always check the registry
+#if [[ "$OSTYPE" == "silverblue" ]]; then
+#    rpm-ostree upgrade --check --unchanged-exit-77 &> /dev/null
+#fi
+
+# vim: set ft=sh ts=2 sw=2 et:
