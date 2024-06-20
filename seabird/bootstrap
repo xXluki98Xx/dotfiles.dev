@@ -1,0 +1,7 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    flatpak install -y --or-update flathub dev.skynomads.Seabird
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:
