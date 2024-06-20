@@ -1,0 +1,22 @@
+# shellcheck shell=bash
+
+if [[ "$OSTYPE" == "silverblue" ]]; then
+    flatpak install -y --or-update flathub io.kinvolk.Headlamp
+fi
+
+#if [[ "$OSTYPE" == "mac" ]] || [[ "$OSTYPE" == "darwin" ]]; then
+#    cask headlamp
+#fi
+
+#if [[ "$OSTYPE" == "ubuntu" ]] || [[ "$OSTYPE" == "fedora" ]]; then
+#    if [[ ! -d /snap/headlamp ]]; then
+#        echo installing headlamp
+#        sudo snap install headlamp
+#    fi
+#fi
+
+if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "windows" ]]; then
+    choco install headlamp
+fi
+
+# vim: set ft=sh ts=2 sw=2 et:
