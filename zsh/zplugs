@@ -78,11 +78,11 @@ zplug 'junegunn/fzf', \
           sed --in-place --regexp-extended \'s/--height \\$\\{FZF_TMUX_HEIGHT.....\\}//g\' shell/*
         fi
       '
-zplug 'BurntSushi/ripgrep', \
-      from:gh-r, \
-      as:command, \
-      rename-to:rg, \
-      if:"[[ $OSTYPE = linux* && ! -f /proc/syno_cpu_arch ]]"
+#zplug 'BurntSushi/ripgrep', \
+#      from:gh-r, \
+#      as:command, \
+#      rename-to:rg, \
+#      if:"[[ $OSTYPE = linux* && ! -f /proc/syno_cpu_arch ]]"
 
 # Plugins related to git.
 zplug 'so-fancy/diff-so-fancy', \
